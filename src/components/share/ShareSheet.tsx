@@ -6,6 +6,7 @@ import { ErrorNote } from "@/components/ui/ErrorNote";
 import { Sheet } from "@/components/ui/Sheet";
 import { blobToDataUrl } from "@/lib/image";
 import { CARD_HEIGHT, CARD_WIDTH, canShareFile, downloadBlob, renderCardToBlob, shareFileName } from "@/lib/share";
+import { usePhoto } from "@/lib/local-db";
 import type { Meal } from "@/lib/types";
 import { ShareCard, fitCardTitle } from "./ShareCard";
 
@@ -32,7 +33,7 @@ function usePhotoDataUrl(photo: Blob | undefined) {
 }
 
 function SheetBody({ meal, note }: { meal: Meal; note?: string }) {
-  const photo = usePhotoDataUrl(meal.photo);
+  const photo = usePhotoDataUrl(usePhoto(meal.id) ?? undefined);
   const frameRef = useRef<HTMLDivElement>(null);
   const exportRef = useRef<HTMLDivElement>(null);
   const [frameWidth, setFrameWidth] = useState(0);

@@ -11,7 +11,8 @@ import { Field, INPUT_CLASS } from "@/components/ui/Field";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { AnalyzeClientError, ERROR_MESSAGE, analyze } from "@/lib/api-client";
 import { nowTime, resolveDateParam, todayKey, type DateKey } from "@/lib/dates";
-import { requestPersistentStorage, saveMeal } from "@/lib/db";
+import { putPhoto, requestPersistentStorage } from "@/lib/local-db";
+import { saveMeal } from "@/lib/store";
 import { formatDayLong } from "@/lib/format";
 import { prepareImage } from "@/lib/image";
 import { toMealItem } from "@/lib/nutrition";
@@ -95,13 +96,16 @@ function AddMeal() {
     setError(null);
     try {
       const now = new Date().toISOString();
-      await saveMeal({
+      // The photo stays on this device; only the meal goes to the account.
+      if (photo) await putPhoto(mealId, photo.blob);
+      // Firestore applies the write locally at once and syncs in the background.
+      saveMeal({
         id: mealId,
         date,
         time: time || defaultTime(date),
         source: photo && description ? "both" : photo ? "photo" : "text",
         ...(description ? { description } : {}),
-        ...(photo ? { photo: photo.blob } : {}),
+        hasPhoto: photo !== null,
         ...draft,
         title: draft.title.trim(),
         createdAt: now,

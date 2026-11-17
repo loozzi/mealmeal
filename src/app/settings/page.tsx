@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { AccountSection } from "@/components/auth/AccountSection";
 import { GoalForm } from "@/components/goal/GoalForm";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { todayKey } from "@/lib/dates";
@@ -26,6 +27,7 @@ export default function SettingsPage() {
             onSaved={() => router.push("/")}
           />
         )}
+        <AccountSection />
       </main>
     </>
   );

@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/Button";
 import { ErrorNote } from "@/components/ui/ErrorNote";
 import { Field, fieldAria, INPUT_CLASS } from "@/components/ui/Field";
 import { todayKey } from "@/lib/dates";
-import { saveProfileAndGoal } from "@/lib/db";
 import { formatInt, parseDecimal } from "@/lib/format";
 import {
   ACTIVITY_OPTIONS,
@@ -16,6 +15,7 @@ import {
   tdee,
   type BodyStats,
 } from "@/lib/tdee";
+import { saveProfileAndGoal } from "@/lib/store";
 import type { Activity, Goal, GoalMode, Profile, Sex } from "@/lib/types";
 
 type Props = {
@@ -143,7 +143,8 @@ export function GoalForm({ initial, submitLabel, onSaved }: Props) {
     };
 
     try {
-      await saveProfileAndGoal(profile, {
+      // Applied locally at once; a failed sync is reported by the banner.
+      saveProfileAndGoal(profile, {
         effectiveFrom: todayKey(),
         mode,
         targetKcal,

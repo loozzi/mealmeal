@@ -1,51 +1,12 @@
-import { expect, test, type Page } from "@playwright/test";
-
-const ANALYSIS = {
-  result: {
-    title: "Cơm gà áp chảo",
-    confidence: "medium",
-    notes: "",
-    items: [
-      { name: "Cơm trắng", grams: 200, kcal: 260, carbs_g: 57, protein_g: 5, fat_g: 0.5, fiber_g: 0.6 },
-      { name: "Gà áp chảo", grams: 150, kcal: 240, carbs_g: 0, protein_g: 45, fat_g: 6, fiber_g: 0 },
-    ],
-  },
-};
-
-/** Collects console errors and uncaught page errors for the whole test. */
-function trackErrors(page: Page): string[] {
-  const errors: string[] = [];
-  page.on("console", (msg) => {
-    if (msg.type() === "error") errors.push(`console: ${msg.text()}`);
-  });
-  page.on("pageerror", (err) => errors.push(`pageerror: ${err.message}`));
-  return errors;
-}
-
-async function onboard(page: Page) {
-  await page.goto("/");
-  await expect(page).toHaveURL(/\/onboarding$/);
-
-  await page.getByRole("button", { name: "Thâm hụt calo (giảm mỡ)" }).click();
-  await page.getByRole("button", { name: "Nam", exact: true }).click();
-  await page.getByLabel("Tuổi").fill("25");
-  await page.getByLabel("Chiều cao (cm)").fill("175");
-  await page.getByLabel("Cân nặng (kg)").fill("70");
-  await page.getByRole("button", { name: /^Vận động vừa/ }).click();
-  await page.getByRole("button", { name: "Tiếp tục" }).click();
-
-  const target = page.getByLabel("Mục tiêu calories mỗi ngày (kcal)");
-  await expect(target).toHaveValue("2100");
-  await target.fill("2000");
-  await page.getByRole("button", { name: "Bắt đầu" }).click();
-  await expect(page).toHaveURL(/\/$/);
-}
+import { expect, test } from "@playwright/test";
+import { ANALYSIS, onboard, signIn, trackErrors, uniqueEmail } from "./helpers";
 
 test("onboarding, add, edit, share and delete a meal", async ({ page }) => {
   const errors = trackErrors(page);
   await page.route("**/api/analyze", (route) => route.fulfill({ status: 200, json: ANALYSIS }));
 
-  // 1–2. Onboarding.
+  // 1–2. Sign in, then onboarding.
+  await signIn(page, uniqueEmail("main"));
   await onboard(page);
 
   // 3. Empty day.
@@ -108,6 +69,7 @@ test("each visit to the add, meal and settings screens starts fresh", async ({ p
     const title = call === 1 ? "Bữa một" : "Bữa hai";
     return route.fulfill({ status: 200, json: { result: { ...ANALYSIS.result, title } } });
   });
+  await signIn(page, uniqueEmail("fresh"));
   await onboard(page);
   const addPage = async (text: string) => {
     await page.getByRole("link", { name: "Thêm bữa" }).click();
@@ -161,6 +123,7 @@ test("a photo or text that is not food keeps what was typed", async ({ page }) =
   await page.route("**/api/analyze", (route) =>
     route.fulfill({ status: 422, json: { error: { code: "NOT_FOOD" } } }),
   );
+  await signIn(page, uniqueEmail("notfood"));
   await onboard(page);
 
   await page.getByRole("link", { name: "Thêm bữa" }).click();

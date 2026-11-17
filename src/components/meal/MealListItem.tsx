@@ -3,15 +3,19 @@
 import Link from "next/link";
 import { formatInt } from "@/lib/format";
 import { mealNutrients } from "@/lib/nutrition";
+import { usePhoto } from "@/lib/local-db";
 import type { Meal } from "@/lib/types";
 import { useObjectUrl } from "@/lib/use-object-url";
 
 export function MealListItem({ meal }: { meal: Meal }) {
-  const photoUrl = useObjectUrl(meal.photo);
+  const photo = usePhoto(meal.id);
+  const photoUrl = useObjectUrl(photo ?? undefined);
+  // Grey box while the local photo loads; a photo taken on another device shows the letter tile.
+  const showPhoto = meal.hasPhoto && photo !== null;
 
   return (
     <Link href={`/meal?id=${encodeURIComponent(meal.id)}`} className="flex min-h-16 items-center gap-3 px-3 py-2 active:bg-bg">
-      {meal.photo ? (
+      {showPhoto ? (
         photoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element -- local blob URL, nothing to optimise
           <img src={photoUrl} alt="" width={48} height={48} className="size-12 shrink-0 rounded-xl object-cover" />

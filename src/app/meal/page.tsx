@@ -11,7 +11,8 @@ import { ErrorNote } from "@/components/ui/ErrorNote";
 import { Field, INPUT_CLASS, fieldAria } from "@/components/ui/Field";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { isFuture, parseDateKey, todayKey } from "@/lib/dates";
-import { deleteMeal, saveMeal } from "@/lib/db";
+import { deletePhoto, usePhoto } from "@/lib/local-db";
+import { deleteMeal, saveMeal } from "@/lib/store";
 import { useMeal } from "@/lib/db-hooks";
 import type { Meal } from "@/lib/types";
 import { useObjectUrl } from "@/lib/use-object-url";
@@ -37,7 +38,10 @@ function MealForm({ meal }: { meal: Meal }) {
   const [error, setError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<"delete" | "leave" | null>(null);
   const [sharing, setSharing] = useState(false);
-  const photoUrl = useObjectUrl(meal.photo);
+  const photo = usePhoto(meal.id);
+  const photoUrl = useObjectUrl(photo ?? undefined);
+  // The meal has a photo, but it was taken on another device (photos never leave the device).
+  const photoElsewhere = meal.hasPhoto && photo === null;
 
   const today = todayKey();
   const dateOk = parseDateKey(date) !== null && !isFuture(date, today);
@@ -52,7 +56,7 @@ function MealForm({ meal }: { meal: Meal }) {
     setBusy("save");
     setError(null);
     try {
-      await saveMeal({ ...meal, ...draft, title: draft.title.trim(), date, time });
+      saveMeal({ ...meal, ...draft, title: draft.title.trim(), date, time });
       router.push(`/?d=${date}`);
     } catch {
       setBusy(null);
@@ -65,7 +69,8 @@ function MealForm({ meal }: { meal: Meal }) {
     setBusy("delete");
     setError(null);
     try {
-      await deleteMeal(meal.id);
+      deleteMeal(meal.id);
+      void deletePhoto(meal.id).catch(() => {});
       router.replace(homeHref);
     } catch {
       setBusy(null);
@@ -91,6 +96,7 @@ function MealForm({ meal }: { meal: Meal }) {
       />
       <main className={MAIN_CLASS}>
         <MealEditor value={draft} onChange={setDraft} photoUrl={photoUrl} onValidityChange={setEditorValid} />
+        {photoElsewhere && <p className="-mt-2 text-[13px] text-muted">Ảnh chỉ có trên thiết bị đã chụp.</p>}
         <div className="grid grid-cols-2 gap-3">
           <Field label="Ngày" htmlFor="meal-date" error={dateError}>
             <input

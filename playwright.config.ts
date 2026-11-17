@@ -13,10 +13,29 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   projects: [{ name: "Pixel 7", use: { ...devices["Pixel 7"] } }],
-  webServer: {
-    command: `npm run build && npm run start -- -p ${PORT}`,
-    url: `http://localhost:${PORT}`,
-    timeout: 300_000,
-    reuseExistingServer: false,
-  },
+  webServer: [
+    {
+      // Auth on 9099, Firestore on 8085, in-memory: every run starts empty.
+      command: "npm run emulators",
+      url: "http://127.0.0.1:8085",
+      timeout: 120_000,
+      reuseExistingServer: false,
+      // The CLI stops its Java emulators on SIGINT; a hard kill would leave them holding the ports.
+      gracefulShutdown: { signal: "SIGINT", timeout: 10_000 },
+    },
+    {
+      command: `npm run build && npm run start -- -p ${PORT}`,
+      url: `http://localhost:${PORT}`,
+      timeout: 300_000,
+      reuseExistingServer: false,
+      // Process env wins over .env.local, so the app talks to the emulators, never a real project.
+      env: {
+        NEXT_PUBLIC_FIREBASE_PROJECT_ID: "demo-mealmeal",
+        NEXT_PUBLIC_FIREBASE_API_KEY: "demo-key",
+        NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "127.0.0.1",
+        NEXT_PUBLIC_FIREBASE_APP_ID: "demo-app",
+        FIREBASE_AUTH_EMULATOR_HOST: "127.0.0.1:9099",
+      },
+    },
+  ],
 });

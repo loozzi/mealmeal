@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Be_Vietnam_Pro } from "next/font/google";
-import { GoalGate } from "@/components/goal/GoalGate";
+import { AppGate } from "@/components/auth/AppGate";
+import { AuthProvider } from "@/components/auth/AuthProvider";
+import { SyncErrorBanner } from "@/components/auth/SyncErrorBanner";
 import "./globals.css";
 
 const beVietnam = Be_Vietnam_Pro({
@@ -29,7 +31,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html lang="vi" className={`${beVietnam.variable} antialiased`}>
       <body className="bg-bg font-sans text-ink">
         <div className="mx-auto min-h-dvh max-w-[480px]">
-          <GoalGate>{children}</GoalGate>
+          <AuthProvider>
+            <SyncErrorBanner />
+            <AppGate>{children}</AppGate>
+          </AuthProvider>
         </div>
       </body>
     </html>
