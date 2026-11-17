@@ -29,7 +29,7 @@ describe("extractJson", () => {
 
 describe("ERROR_STATUS", () => {
   it("maps codes to HTTP statuses", () => {
-    expect(ERROR_STATUS).toEqual({ INVALID_INPUT: 400, NOT_FOOD: 422, RATE_LIMITED: 429, AI_ERROR: 502, TIMEOUT: 504 });
+    expect(ERROR_STATUS).toEqual({ INVALID_INPUT: 400, NOT_FOOD: 422, RATE_LIMITED: 429, AI_ERROR: 502, TIMEOUT: 504, UNAUTHENTICATED: 401 });
   });
 });
 

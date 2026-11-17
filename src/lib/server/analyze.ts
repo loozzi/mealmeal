@@ -17,6 +17,7 @@ export const ERROR_STATUS: Record<ApiErrorCode, number> = {
   RATE_LIMITED: 429,
   AI_ERROR: 502,
   TIMEOUT: 504,
+  UNAUTHENTICATED: 401,
 };
 
 const MAX_ATTEMPTS = 2;

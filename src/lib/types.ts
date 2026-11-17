@@ -7,7 +7,7 @@ export type Confidence = "low" | "medium" | "high";
 
 export type Nutrients = { kcal: number; carbs: number; protein: number; fat: number; fiber: number };
 
-export type ApiErrorCode = "INVALID_INPUT" | "NOT_FOOD" | "RATE_LIMITED" | "AI_ERROR" | "TIMEOUT";
+export type ApiErrorCode = "INVALID_INPUT" | "NOT_FOOD" | "RATE_LIMITED" | "AI_ERROR" | "TIMEOUT" | "UNAUTHENTICATED";
 
 export const CONFIDENCE_LABEL: Record<Confidence, string> = {
   low: "Thấp",

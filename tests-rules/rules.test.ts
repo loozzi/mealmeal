@@ -90,8 +90,9 @@ describe("meals", () => {
   });
 
   test("missing hasPhoto rejected", async () => {
-    const { hasPhoto: _drop, ...rest } = meal();
-    await assertFails(setDoc(doc(alice(), "users/alice/meals/m1"), rest));
+    const noFlag: Record<string, unknown> = meal();
+    delete noFlag.hasPhoto;
+    await assertFails(setDoc(doc(alice(), "users/alice/meals/m1"), noFlag));
   });
 
   test("owner can delete own meal", async () => {

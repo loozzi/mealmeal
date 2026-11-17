@@ -5,10 +5,12 @@ const mocks = vi.hoisted(() => ({
   create: vi.fn(),
   check: vi.fn(),
   getAiConfig: vi.fn(),
+  verify: vi.fn(),
 }));
 
 vi.mock("@/lib/server/ai-config", () => ({ getAiConfig: mocks.getAiConfig }));
 vi.mock("@/lib/server/rate-limit", () => ({ getRateLimiter: () => ({ check: mocks.check }) }));
+vi.mock("@/lib/server/auth", () => ({ verifyIdToken: mocks.verify }));
 
 import { POST } from "@/app/api/analyze/route";
 import { AnalyzeError } from "@/lib/server/analyze";
@@ -21,7 +23,7 @@ const good = {
   items: [{ name: "Cơm", grams: 200, kcal: 260, carbs_g: 57, protein_g: 5, fat_g: 0.5, fiber_g: 0.6 }],
 };
 const reply = (content: string | null) => ({ choices: [{ message: { content } }] });
-const post = (body: string, headers: Record<string, string> = {}) =>
+const post = (body: string, headers: Record<string, string> = { authorization: "Bearer good" }) =>
   POST(new Request("http://x/api/analyze", { method: "POST", headers, body }));
 const validBody = JSON.stringify({ text: "cơm gà" });
 
@@ -41,6 +43,10 @@ beforeEach(() => {
     client: { chat: { completions: { create: mocks.create } } },
     model: "m",
     jsonMode: "json_schema",
+  });
+  mocks.verify.mockReset().mockImplementation(async (token: string) => {
+    if (token === "good") return { uid: "u1" };
+    throw new AnalyzeError("UNAUTHENTICATED");
   });
   vi.spyOn(console, "info").mockImplementation(() => {});
 });
@@ -76,14 +82,35 @@ describe("POST /api/analyze", () => {
     expect(mocks.create).not.toHaveBeenCalled();
   });
 
-  it("keys the limiter by the first forwarded address", async () => {
-    await post(validBody, { "x-forwarded-for": "1.2.3.4, 5.6.7.8" });
-    expect(mocks.check).toHaveBeenCalledWith("1.2.3.4");
+  it("401 without Authorization", async () => {
+    const res = await post(validBody, {});
+    expect(res.status).toBe(401);
+    const json = await res.json();
+    expect(json.error.code).toBe("UNAUTHENTICATED");
+    expect(json.error.message).toBe("Phiên đăng nhập đã hết. Hãy đăng nhập lại.");
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.check).not.toHaveBeenCalled();
   });
 
-  it("keys the limiter by 'unknown' without a forwarded header", async () => {
-    await post(validBody);
-    expect(mocks.check).toHaveBeenCalledWith("unknown");
+  it("401 with a bad token", async () => {
+    await expectError(await post(validBody, { authorization: "Bearer bad" }), 401, "UNAUTHENTICATED");
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.check).not.toHaveBeenCalled();
+  });
+
+  it("401 with a non-Bearer header", async () => {
+    await expectError(await post(validBody, { authorization: "Basic good" }), 401, "UNAUTHENTICATED");
+  });
+
+  it("checks the token before reading an oversized body", async () => {
+    const body = JSON.stringify({ text: "x", image: "data:image/jpeg;base64," + "A".repeat(4_200_001) });
+    await expectError(await post(body, {}), 401, "UNAUTHENTICATED");
+  });
+
+  it("rate limit keyed by uid", async () => {
+    await post(validBody, { authorization: "Bearer good", "x-forwarded-for": "1.2.3.4" });
+    expect(mocks.verify).toHaveBeenCalledWith("good");
+    expect(mocks.check).toHaveBeenCalledWith("uid:u1");
   });
 
   it("returns 422 when the model sees no food", async () => {
@@ -121,5 +148,6 @@ describe("POST /api/analyze", () => {
     const line = (console.info as unknown as { mock: { calls: unknown[][] } }).mock.calls.flat().join(" ");
     expect(line).toMatch(/OK/);
     expect(line).not.toContain("cơm gà");
+    expect(line).not.toContain("u1");
   });
 });

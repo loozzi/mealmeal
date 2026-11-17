@@ -17,6 +17,7 @@ export const ERROR_MESSAGE: Record<Exclude<ClientErrorCode, "ABORTED">, string> 
   RATE_LIMITED: "Bạn đã dùng hết lượt phân tích. Hãy thử lại sau.",
   AI_ERROR: "Hệ thống phân tích đang gặp sự cố. Hãy thử lại.",
   TIMEOUT: "Phân tích mất quá nhiều thời gian. Hãy thử lại.",
+  UNAUTHENTICATED: "Phiên đăng nhập đã hết. Hãy đăng nhập lại.",
   NETWORK: "Không có kết nối mạng.",
 };
 

@@ -1,6 +1,7 @@
 import { analyzeRequestSchema } from "@/lib/schema";
 import { getAiConfig } from "@/lib/server/ai-config";
 import { analyzeMeal, AnalyzeError, ERROR_STATUS } from "@/lib/server/analyze";
+import { verifyIdToken } from "@/lib/server/auth";
 import { getRateLimiter } from "@/lib/server/rate-limit";
 import type { ApiErrorCode } from "@/lib/types";
 
@@ -17,11 +18,15 @@ const ERROR_MESSAGE: Record<ApiErrorCode, string> = {
   RATE_LIMITED: "Bạn đã dùng hết lượt phân tích. Hãy thử lại sau.",
   AI_ERROR: "Hệ thống phân tích đang gặp sự cố. Hãy thử lại.",
   TIMEOUT: "Phân tích mất quá nhiều thời gian. Hãy thử lại.",
+  UNAUTHENTICATED: "Phiên đăng nhập đã hết. Hãy đăng nhập lại.",
 };
 
-function clientKey(req: Request): string {
-  const first = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  return first || "unknown";
+/** The signed-in user's id from `Authorization: Bearer <Firebase ID token>`. */
+async function authenticate(req: Request): Promise<string> {
+  const match = req.headers.get("authorization")?.match(/^Bearer\s+(\S+)$/i);
+  if (!match) throw new AnalyzeError("UNAUTHENTICATED");
+  const { uid } = await verifyIdToken(match[1]);
+  return uid;
 }
 
 async function readInput(req: Request) {
@@ -44,7 +49,9 @@ export async function POST(req: Request): Promise<Response> {
   let response: Response;
 
   try {
-    const { ok } = await getRateLimiter().check(clientKey(req));
+    // Before the body is read, so an unauthenticated caller costs nothing.
+    const uid = await authenticate(req);
+    const { ok } = await getRateLimiter().check(`uid:${uid}`);
     if (!ok) throw new AnalyzeError("RATE_LIMITED");
 
     const input = await readInput(req);
@@ -58,7 +65,7 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
 
-  // Never log the request body: it holds the user's photo and description.
+  // Never log the request body (photo, description) or the user id.
   console.info(`analyze ${outcome} ${Date.now() - started}ms`);
   return response;
 }
