@@ -31,7 +31,8 @@ export interface Meal {
   title: string;
   source: "photo" | "text" | "both";
   description?: string;
-  photo?: Blob;
+  /** The photo itself stays on the device that took it (local-db `photos`), never in Firestore. */
+  hasPhoto: boolean;
   items: MealItem[];
   confidence: Confidence;
   notes: string;
@@ -50,11 +51,17 @@ export interface Profile {
   updatedAt: string;
 }
 
+/** Stored at `users/{uid}/goals/{effectiveFrom}`, so one goal per day. */
 export interface Goal {
-  id?: number;
   effectiveFrom: DateKey;
   mode: GoalMode;
   targetKcal: number;
   suggestedKcal?: number;
   createdAt: string;
 }
+
+/** A meal as the v1 app stored it on the device, before accounts. */
+export type LegacyMeal = Omit<Meal, "hasPhoto"> & { photo?: Blob };
+
+/** A goal as the v1 app stored it on the device, before accounts. */
+export type LegacyGoal = Goal & { id?: number };
