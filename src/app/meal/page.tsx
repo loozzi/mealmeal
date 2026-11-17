@@ -4,6 +4,7 @@ import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { MealEditor, type MealDraft } from "@/components/meal/MealEditor";
+import { ShareSheet } from "@/components/share/ShareSheet";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { ErrorNote } from "@/components/ui/ErrorNote";
@@ -35,6 +36,7 @@ function MealForm({ meal }: { meal: Meal }) {
   const [busy, setBusy] = useState<"save" | "delete" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<"delete" | "leave" | null>(null);
+  const [sharing, setSharing] = useState(false);
   const photoUrl = useObjectUrl(meal.photo);
 
   const today = todayKey();
@@ -73,7 +75,20 @@ function MealForm({ meal }: { meal: Meal }) {
 
   return (
     <>
-      <PageHeader title="Bữa ăn" backHref={homeHref} onBack={dirty ? () => setDialog("leave") : undefined} />
+      <PageHeader
+        title="Bữa ăn"
+        backHref={homeHref}
+        onBack={dirty ? () => setDialog("leave") : undefined}
+        right={
+          <button
+            type="button"
+            onClick={() => setSharing(true)}
+            className="-mr-2 inline-flex min-h-11 items-center rounded-xl px-3 text-[15px] font-semibold text-brand active:bg-line/60"
+          >
+            Chia sẻ
+          </button>
+        }
+      />
       <main className={MAIN_CLASS}>
         <MealEditor value={draft} onChange={setDraft} photoUrl={photoUrl} onValidityChange={setEditorValid} />
         <div className="grid grid-cols-2 gap-3">
@@ -106,6 +121,12 @@ function MealForm({ meal }: { meal: Meal }) {
           Xóa bữa ăn
         </Button>
       </main>
+      <ShareSheet
+        open={sharing}
+        onClose={() => setSharing(false)}
+        meal={meal}
+        note={dirty ? "Ảnh dùng dữ liệu đã lưu, chưa gồm các thay đổi đang sửa." : undefined}
+      />
       <ConfirmDialog
         open={dialog === "delete"}
         title="Xóa bữa ăn"
