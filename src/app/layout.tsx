@@ -13,6 +13,8 @@ const beVietnam = Be_Vietnam_Pro({
 export const metadata: Metadata = {
   title: "MealMeal",
   description: "Chụp hoặc mô tả bữa ăn, AI ước tính calories và dinh dưỡng.",
+  icons: { apple: "/apple-touch-icon.png" },
+  appleWebApp: { capable: true, title: "MealMeal", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {
