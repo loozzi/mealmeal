@@ -1,0 +1,43 @@
+rules_version = '2';
+
+// MealMeal: each signed-in user reads and writes only users/{their uid}/**.
+// Photos never reach Firestore, so any document carrying a `photo` field is refused.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function owner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function noPhoto() {
+      return !('photo' in request.resource.data);
+    }
+
+    function validMeal(id, d) {
+      return d.id == id
+        && d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && d.title is string && d.title.size() <= 200
+        && d.items is list && d.items.size() <= 30
+        && d.hasPhoto is bool;
+    }
+
+    function validGoal(date, d) {
+      return d.effectiveFrom == date
+        && d.targetKcal is number && d.targetKcal >= 800 && d.targetKcal <= 6000;
+    }
+
+    match /users/{uid} {
+      allow read, delete: if owner(uid);
+      allow create, update: if owner(uid) && noPhoto();
+
+      match /meals/{mealId} {
+        allow read, delete: if owner(uid);
+        allow create, update: if owner(uid) && noPhoto() && validMeal(mealId, request.resource.data);
+      }
+
+      match /goals/{date} {
+        allow read, delete: if owner(uid);
+        allow create, update: if owner(uid) && noPhoto() && validGoal(date, request.resource.data);
+      }
+    }
+  }
+}

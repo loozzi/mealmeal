@@ -9,14 +9,18 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-mealmeal \"vitest run --config vitest.rules.config.ts\"",
+    "emulators": "firebase emulators:start --only auth,firestore --project demo-mealmeal"
   },
   "dependencies": {
     "@upstash/ratelimit": "^2.2.1",
     "@upstash/redis": "^1.41.0",
     "dexie": "^4.4.7",
     "dexie-react-hooks": "^4.4.0",
+    "firebase": "^13.4.0",
     "html-to-image": "^1.11.13",
+    "jose": "^6.2.17",
     "next": "16.4.6",
     "openai": "^7.57.0",
     "react": "19.3.0",
@@ -24,6 +28,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^6.0.0",
     "@playwright/test": "^1.65.1",
     "@tailwindcss/turbopack": "4.3.3",
     "@types/node": "^22.20.5",
@@ -32,6 +37,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.4.6",
     "fake-indexeddb": "^6.2.8",
+    "firebase-tools": "^15.36.0",
     "tailwindcss": "4.3.3",
     "typescript": "^5",
     "vitest": "^5.1.0"
