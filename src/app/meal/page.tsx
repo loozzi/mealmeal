@@ -191,9 +191,11 @@ function MealDetail() {
 }
 
 export default function MealPage() {
+  // Routes stay mounted (hidden) between visits: a fresh visit reloads the record and drops unsaved edits.
+  const { bfcacheId } = useRouter();
   return (
     <Suspense fallback={null}>
-      <MealDetail />
+      <MealDetail key={bfcacheId} />
     </Suspense>
   );
 }

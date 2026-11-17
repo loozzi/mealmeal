@@ -20,6 +20,7 @@ export default function SettingsPage() {
         {/* The form copies `initial` into its own state, so it is mounted only once the data is in. */}
         {ready && (
           <GoalForm
+            key={router.bfcacheId}
             initial={{ profile: profile ?? undefined, goal: goalForDate(goals, todayKey()) }}
             submitLabel="Lưu"
             onSaved={() => router.push("/")}

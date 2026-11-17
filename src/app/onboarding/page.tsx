@@ -11,7 +11,7 @@ export default function OnboardingPage() {
       <p className="mt-2 mb-6 text-[15px] text-muted">
         Đặt mục tiêu calories mỗi ngày để bắt đầu theo dõi bữa ăn.
       </p>
-      <GoalForm submitLabel="Bắt đầu" onSaved={() => router.replace("/")} />
+      <GoalForm key={router.bfcacheId} submitLabel="Bắt đầu" onSaved={() => router.replace("/")} />
     </main>
   );
 }

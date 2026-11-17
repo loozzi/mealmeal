@@ -210,9 +210,12 @@ function AddMeal() {
 }
 
 export default function AddPage() {
+  // Routes stay mounted (hidden) between visits, so a fresh visit must start a fresh form;
+  // back/forward keeps the same id and restores what was typed.
+  const { bfcacheId } = useRouter();
   return (
     <Suspense fallback={null}>
-      <AddMeal />
+      <AddMeal key={bfcacheId} />
     </Suspense>
   );
 }

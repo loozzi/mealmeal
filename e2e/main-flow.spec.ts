@@ -100,6 +100,63 @@ test("onboarding, add, edit, share and delete a meal", async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
+test("each visit to the add, meal and settings screens starts fresh", async ({ page }) => {
+  const errors = trackErrors(page);
+  let call = 0;
+  await page.route("**/api/analyze", (route) => {
+    call += 1;
+    const title = call === 1 ? "Bữa một" : "Bữa hai";
+    return route.fulfill({ status: 200, json: { result: { ...ANALYSIS.result, title } } });
+  });
+  await onboard(page);
+  const addPage = async (text: string) => {
+    await page.getByRole("link", { name: "Thêm bữa" }).click();
+    await expect(page.getByLabel("Mô tả")).toHaveValue("");
+    await page.getByLabel("Mô tả").fill(text);
+    await page.getByRole("button", { name: "Phân tích" }).click();
+    await expect(page.getByRole("button", { name: "Lưu bữa ăn" })).toBeVisible();
+  };
+
+  // Save one meal, then "Thêm bữa" again shows an empty form, not the last result.
+  await addPage("bữa một");
+  await page.getByRole("button", { name: "Lưu bữa ăn" }).click();
+  await expect(page.getByText("Bữa một")).toBeVisible();
+
+  // Discard a result, then "Thêm bữa" again is empty too.
+  await addPage("bữa hai");
+  await page.getByRole("button", { name: "Quay lại" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Bỏ" }).click();
+  await expect(page).toHaveURL(/\/\?d=/);
+  await page.getByRole("link", { name: "Thêm bữa" }).click();
+  await expect(page.getByLabel("Mô tả")).toHaveValue("");
+  await expect(page.getByRole("button", { name: "Phân tích" })).toBeDisabled();
+
+  // Save a second meal, then open each meal in turn: the detail shows the one opened.
+  await page.getByLabel("Mô tả").fill("bữa hai");
+  await page.getByRole("button", { name: "Phân tích" }).click();
+  await page.getByRole("button", { name: "Lưu bữa ăn" }).click();
+  await page.getByRole("link", { name: /Bữa một/ }).click();
+  await expect(page.getByLabel("Tên bữa")).toHaveValue("Bữa một");
+  await page.getByLabel("Tên bữa").fill("Bữa một chưa lưu");
+  await page.goBack();
+  await page.getByRole("link", { name: /Bữa hai/ }).click();
+  await expect(page.getByLabel("Tên bữa")).toHaveValue("Bữa hai");
+  await page.goBack();
+  await page.getByRole("link", { name: /Bữa một/ }).click();
+  await expect(page.getByLabel("Tên bữa")).toHaveValue("Bữa một");
+
+  // Settings: a change that was not saved is gone on the next visit.
+  await page.goto("/");
+  await page.getByRole("link", { name: "Mục tiêu" }).click();
+  await page.getByRole("button", { name: "Tôi đã biết con số của mình" }).click();
+  await page.getByLabel("Mục tiêu calories mỗi ngày (kcal)").fill("3000");
+  await page.goBack();
+  await page.getByRole("link", { name: "Mục tiêu" }).click();
+  await expect(page.getByRole("button", { name: "Tôi đã biết con số của mình" })).toBeVisible();
+
+  expect(errors).toEqual([]);
+});
+
 test("a photo or text that is not food keeps what was typed", async ({ page }) => {
   await page.route("**/api/analyze", (route) =>
     route.fulfill({ status: 422, json: { error: { code: "NOT_FOOD" } } }),
