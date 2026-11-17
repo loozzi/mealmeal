@@ -60,4 +60,3 @@ Kết quả: **34 đạt**, **0 không đạt**, **3 chưa kiểm được** (c�
 
 Log server trong lượt kiểm với model thật chỉ có các dòng dạng `analyze OK 4553ms`, `analyze NOT_FOOD 2639ms`: không có ảnh hay mô tả.
 
-Lưu ý: endpoint thử dùng `http://` không mã hóa. Trên production nên dùng `https://` để API key và ảnh không đi qua mạng dưới dạng chữ thường.
