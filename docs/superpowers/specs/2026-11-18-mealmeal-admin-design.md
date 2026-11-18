@@ -30,7 +30,7 @@ Chi phí vận hành vẫn là **0 đồng**: chỉ dùng Firebase gói Spark v�
 - Xuất CSV, gửi email báo cáo, cảnh báo khi vượt ngân sách.
 - Biểu đồ dùng thư viện. Phần "Theo ngày" dùng thanh ngang bằng CSS.
 - Khoảng thời gian tùy chọn (chọn từ ngày nào đến ngày nào).
-- Nhiều cấp quyền admin. Ai có trong `ADMIN_EMAILS` thì xem được tất cả.
+- Nhiều cấp quyền admin. Ai là admin thì xem được tất cả.
 
 ### 2.3 Điều phải tránh
 
@@ -144,10 +144,20 @@ Rules mặc định đã chặn, nhưng ghi rõ để người đọc sau hiểu
 
 ## 6. Quyền admin
 
-- Biến môi trường server `ADMIN_EMAILS`: danh sách email cách nhau bằng dấu phẩy, ví dụ `a@gmail.com,b@gmail.com`. So sánh sau khi `trim()` và đổi về chữ thường. Biến trống hoặc không có: không ai là admin.
+- Danh sách admin **chỉ** nằm trong biến môi trường server `ADMIN_EMAILS`: email cách nhau bằng dấu phẩy, ví dụ `a@gmail.com,b@gmail.com`. Biến không có, hoặc chỉ gồm khoảng trắng và dấu phẩy: không ai là admin.
+- **Không** ghi email admin thật vào code, test, tài liệu hay `.env.example`, vì repo là public. Test và e2e dùng email giả (`admin@example.com`). Chủ dự án yêu cầu.
+- So sánh sau khi `trim()` và đổi về chữ thường, ở cả hai phía.
 - `verifyIdToken` (trong `src/lib/server/auth.ts`) trả thêm `email?: string` và `emailVerified: boolean`, đọc từ claim `email` và `email_verified` của token. Các kiểm tra hiện có giữ nguyên.
-- Một người là admin khi **cả hai**: `emailVerified === true` và email (chữ thường) có trong `ADMIN_EMAILS`. Tài khoản Google luôn có email đã xác minh.
-- Hàm thuần `isAdmin(claims: { email?: string; emailVerified: boolean }, adminEmails: string | undefined): boolean` để test được.
+- Một người là admin khi **cả hai**: `emailVerified === true` và email (chữ thường) có trong danh sách admin đang áp dụng. Tài khoản Google luôn có email đã xác minh.
+- Hàm thuần `isAdmin(claims: { email?: string; emailVerified: boolean }, adminEmails: string | undefined): boolean` để test được. Tham số thứ hai là giá trị thô của `process.env.ADMIN_EMAILS`.
+
+### 6.1 Admin vẫn là người dùng bình thường
+
+Tài khoản admin dùng app y như mọi tài khoản khác. Quyền admin **chỉ thêm** việc xem `/admin` và gọi `/api/admin/stats`, không đổi gì khác:
+
+- Vẫn qua `AppGate`, onboarding, mục tiêu, ghi bữa, đồng bộ, xóa dữ liệu như thường. Dữ liệu bữa ăn nằm ở `users/{uid}` của chính admin, theo cùng Firestore Rules.
+- `/api/analyze` xử lý admin như mọi người: cùng giới hạn lượt, cùng cách ghi số liệu. Lượt dùng của admin có trong thống kê và trong bảng người dùng.
+- Không có giao diện nào khác đi khi là admin (không có link, huy hiệu hay mục cài đặt riêng).
 
 ## 7. Firebase Admin SDK
 
@@ -321,7 +331,7 @@ Thêm vào `src/lib/format.ts` (chỉ làm tròn khi hiển thị):
 | Biến | Bắt buộc | Ghi chú |
 |---|---|---|
 | `FIREBASE_SERVICE_ACCOUNT_B64` | Có, để ghi và xem số liệu | Base64 của file JSON service account. **Bí mật.** Trên Vercel đặt loại Sensitive. Không có thì app vẫn chạy, chỉ không ghi số liệu và trang admin báo chưa cấu hình. |
-| `ADMIN_EMAILS` | Có, để vào trang admin | Danh sách email admin, cách nhau bằng dấu phẩy. |
+| `ADMIN_EMAILS` | Có, để vào trang admin | Danh sách email admin, cách nhau bằng dấu phẩy. Không có thì không ai vào được `/admin`. Trong `.env.example` để trống. |
 | `AI_PRICE_INPUT_PER_1M_USD` | Không | Giá 1 triệu token vào, USD. |
 | `AI_PRICE_OUTPUT_PER_1M_USD` | Không | Giá 1 triệu token ra, USD. |
 
@@ -333,7 +343,7 @@ Thêm vào `src/lib/format.ts` (chỉ làm tròn khi hiển thị):
 
 1. Firebase console → **Project settings → Service accounts** → **Generate new private key**. Tải file JSON về, **không** để trong thư mục dự án.
 2. Mã hóa base64 một dòng: `base64 -w0 <file>.json` (Linux) hoặc `base64 -i <file>.json` (macOS). Đưa kết quả vào `FIREBASE_SERVICE_ACCOUNT_B64` trong `.env.local` và trên Vercel production (Sensitive). Sau đó có thể xóa file JSON.
-3. Đặt `ADMIN_EMAILS` (email Google của chủ dự án) ở `.env.local` và Vercel.
+3. Đặt `ADMIN_EMAILS` (các email Google của chủ dự án) ở `.env.local` và Vercel production.
 4. Tra giá model đang dùng ở nhà cung cấp (hoặc proxy), đặt hai biến giá. Có thể để trống và đặt sau.
 5. Publish lại `firestore.rules` (thêm hai khối ở §5.5).
 
@@ -349,7 +359,9 @@ Thêm vào `src/lib/format.ts` (chỉ làm tròn khi hiển thị):
 8. Ghi số liệu lỗi (Firestore không với tới): người dùng vẫn nhận kết quả phân tích bình thường, log chỉ có `usage write failed <code>`.
 9. Hai request cùng lúc của một người: số đếm tăng đủ 2.
 10. Lúc 23:30 giờ Việt Nam (16:30 UTC) và 00:30 giờ Việt Nam (17:30 UTC hôm trước), số liệu rơi đúng ngày Việt Nam.
-11. Người đăng nhập không có trong `ADMIN_EMAILS` gọi `/api/admin/stats` → 403; mở `/admin` → "Bạn không có quyền xem trang này."
+11. Người đăng nhập không phải admin gọi `/api/admin/stats` → 403; mở `/admin` → "Bạn không có quyền xem trang này."
+11a. `ADMIN_EMAILS=a@example.com,b@example.com`: đăng nhập `a@example.com` hoặc `B@Example.com` vào được `/admin`; email khác thì không. Không đặt `ADMIN_EMAILS`: không ai vào được. Trong repo không có email admin thật nào (kiểm bằng `git grep`).
+11b. Tài khoản admin chụp, ghi bữa, xem lịch sử, đồng bộ như tài khoản thường; lượt phân tích của admin có trong thống kê.
 12. Client SDK (người đã đăng nhập, kể cả admin) đọc hoặc ghi `usageDaily`, `usageTotals` → bị Rules từ chối.
 13. Admin mở `/admin`: thấy đủ tài khoản (kể cả người chưa dùng AI, 0 lượt), số bữa ăn đúng theo khoảng, chi phí đúng công thức §8.4, đổi khoảng thì số đổi theo.
 14. Không đặt giá: trang hiện "Chưa đặt giá", không lỗi.
@@ -362,7 +374,7 @@ Thêm vào `src/lib/format.ts` (chỉ làm tròn khi hiển thị):
 - **Unit (Vitest)**:
   - `vnDateKey` ở hai mốc tiêu chí 10; `rangeDates("today"|"7d"|"30d", now)`.
   - `analyzeMeal` với client giả: đếm `aiCalls`/token khi thành công, thử lại, `NOT_FOOD`, lỗi mạng, thiếu `usage` (tiêu chí 1–4, 7).
-  - `isAdmin`: email đúng/sai, chữ hoa, khoảng trắng, `emailVerified=false`, biến trống.
+  - `isAdmin`: biến không có hoặc trống thì không ai là admin; nhiều email; chữ hoa, khoảng trắng; `emailVerified=false`; thiếu email.
   - `parsePrice` và `costUsd`.
   - `buildStats`: đủ ngày kể cả ngày trống, `activeUsers`, `newAccounts`, thứ tự `users`, uid không còn trong Auth, giá null.
   - `formatUsd`, `formatDateTime`.
