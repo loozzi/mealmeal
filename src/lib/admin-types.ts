@@ -11,3 +11,6 @@ export type UsageCounts = {
   outputTokens: number;
   missingUsage: number;
 };
+
+export type StatsRange = "today" | "7d" | "30d";
+export const STATS_RANGES: readonly StatsRange[] = ["today", "7d", "30d"];

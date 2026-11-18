@@ -50,3 +50,19 @@ export function formatMonth(k: DateKey): string {
 
 /** Column headers for a Monday-first week. */
 export const WEEKDAY_SHORT: readonly string[] = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
+
+/** US dollars with a comma decimal: 4 decimals under $1 (small costs stay visible), else 2. */
+export function formatUsd(n: number): string {
+  const decimals = Math.abs(n) < 1 ? 4 : 2;
+  const scale = 10 ** decimals;
+  const scaled = Math.round(Math.abs(n) * scale);
+  const whole = formatInt(Math.floor(scaled / scale));
+  const frac = String(scaled % scale).padStart(decimals, "0");
+  return `${n < 0 && scaled > 0 ? "-" : ""}$${whole},${frac}`;
+}
+
+/** `dd/MM HH:mm` in the viewer's local time. */
+export function formatDateTime(iso: string): string {
+  const d = new Date(iso);
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}

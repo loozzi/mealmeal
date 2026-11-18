@@ -36,6 +36,7 @@ describe("verifyIdToken", () => {
   it("accepts a valid token", async () => {
     await expect(verifyIdToken(await sign(), { projectId: PROJECT, jwks, emulator: false })).resolves.toEqual({
       uid: "u1",
+      emailVerified: false,
     });
   });
 
@@ -88,7 +89,29 @@ describe("verifyIdToken", () => {
     it("accepted in emulator mode for a demo- project", async () => {
       await expect(verifyIdToken(unsigned(), { projectId: PROJECT, jwks, emulator: true })).resolves.toEqual({
         uid: "u9",
+        emailVerified: false,
       });
+    });
+
+    it("returns the email claims when present", async () => {
+      const token = new UnsecuredJWT({ email: "a@example.com", email_verified: true })
+        .setAudience(PROJECT)
+        .setIssuer(ISS)
+        .setSubject("u9")
+        .setIssuedAt()
+        .setExpirationTime("1h")
+        .encode();
+      await expect(verifyIdToken(token, { projectId: PROJECT, jwks, emulator: true })).resolves.toEqual({
+        uid: "u9",
+        email: "a@example.com",
+        emailVerified: true,
+      });
+    });
+
+    it("reports no email and not verified when the claims are missing", async () => {
+      const r = await verifyIdToken(unsigned(), { projectId: PROJECT, jwks, emulator: true });
+      expect(r.email).toBeUndefined();
+      expect(r.emailVerified).toBe(false);
     });
 
     it("rejected in emulator mode for a real project", async () => {
