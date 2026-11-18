@@ -106,3 +106,54 @@ describe("analyzeMeal", () => {
     expect(create).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("analyzeMeal token tally", () => {
+  const withUsage = (content: string | null, usage: unknown) => ({ ...reply(content), usage });
+  const fresh = () => ({ aiCalls: 0, inputTokens: 0, outputTokens: 0, missingUsage: 0 });
+
+  it("counts one call and its tokens on success", async () => {
+    const tally = fresh();
+    const create = vi.fn().mockResolvedValue(withUsage(JSON.stringify(good), { prompt_tokens: 100, completion_tokens: 20 }));
+    await analyzeMeal({ text: "cơm gà" }, cfg(create), tally);
+    expect(tally).toEqual({ aiCalls: 1, inputTokens: 100, outputTokens: 20, missingUsage: 0 });
+  });
+
+  it("counts both calls when the first output is unusable", async () => {
+    const tally = fresh();
+    const create = vi
+      .fn()
+      .mockResolvedValueOnce(withUsage("rác", { prompt_tokens: 50, completion_tokens: 5 }))
+      .mockResolvedValueOnce(withUsage(JSON.stringify(good), { prompt_tokens: 100, completion_tokens: 20 }));
+    await analyzeMeal({ text: "cơm gà" }, cfg(create), tally);
+    expect(tally).toEqual({ aiCalls: 2, inputTokens: 150, outputTokens: 25, missingUsage: 0 });
+  });
+
+  it("still counts tokens when the answer is NOT_FOOD", async () => {
+    const tally = fresh();
+    const notFood = { ...good, is_food: false, items: [] };
+    const create = vi.fn().mockResolvedValue(withUsage(JSON.stringify(notFood), { prompt_tokens: 30, completion_tokens: 3 }));
+    await expect(analyzeMeal({ text: "cái ghế" }, cfg(create), tally)).rejects.toMatchObject({ code: "NOT_FOOD" });
+    expect(tally).toEqual({ aiCalls: 1, inputTokens: 30, outputTokens: 3, missingUsage: 0 });
+  });
+
+  it("does not count calls that threw", async () => {
+    const tally = fresh();
+    const create = vi.fn().mockRejectedValue(new Error("network"));
+    await expect(analyzeMeal({ text: "cơm gà" }, cfg(create), tally)).rejects.toMatchObject({ code: "AI_ERROR" });
+    expect(tally.aiCalls).toBe(0);
+  });
+
+  it("marks a response without usage as missing", async () => {
+    const tally = fresh();
+    const create = vi.fn().mockResolvedValue(reply(JSON.stringify(good)));
+    await analyzeMeal({ text: "cơm gà" }, cfg(create), tally);
+    expect(tally).toEqual({ aiCalls: 1, inputTokens: 0, outputTokens: 0, missingUsage: 1 });
+  });
+
+  it("treats non-numeric usage as missing", async () => {
+    const tally = fresh();
+    const create = vi.fn().mockResolvedValue(withUsage(JSON.stringify(good), { prompt_tokens: "x", completion_tokens: 20 }));
+    await analyzeMeal({ text: "cơm gà" }, cfg(create), tally);
+    expect(tally).toEqual({ aiCalls: 1, inputTokens: 0, outputTokens: 0, missingUsage: 1 });
+  });
+});

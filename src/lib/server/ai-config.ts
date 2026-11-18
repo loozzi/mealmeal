@@ -5,7 +5,10 @@ import { AnalyzeError } from "./analyze";
 export type ChatClient = {
   chat: {
     completions: {
-      create(args: unknown): Promise<{ choices: { message: { content: string | null } }[] }>;
+      create(args: unknown): Promise<{
+        choices: { message: { content: string | null } }[];
+        usage?: { prompt_tokens?: number; completion_tokens?: number } | null;
+      }>;
     };
   };
 };

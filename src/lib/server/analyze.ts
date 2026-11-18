@@ -1,8 +1,9 @@
 import { APIConnectionTimeoutError } from "openai";
 import { mealAnalysisJsonSchema, modelOutputSchema, type AnalyzeRequest, type MealAnalysis } from "@/lib/schema";
 import type { ApiErrorCode } from "@/lib/types";
-import type { AiConfig } from "./ai-config";
+import type { AiConfig, ChatClient } from "./ai-config";
 import { DEFAULT_USER_TEXT, JSON_OBJECT_SUFFIX, SYSTEM_PROMPT } from "./prompt";
+import type { UsageTally } from "./usage";
 
 export class AnalyzeError extends Error {
   constructor(public code: ApiErrorCode) {
@@ -55,13 +56,29 @@ function parseOutput(content: string | null) {
   }
 }
 
-export async function analyzeMeal(input: AnalyzeRequest, config: AiConfig): Promise<MealAnalysis> {
+type Completion = Awaited<ReturnType<ChatClient["chat"]["completions"]["create"]>>;
+
+/** Adds one answered AI call to the tally; tokens count only when the provider reported both as numbers. */
+function countCall(tally: UsageTally, usage: Completion["usage"]) {
+  tally.aiCalls += 1;
+  const input = usage?.prompt_tokens;
+  const output = usage?.completion_tokens;
+  if (Number.isFinite(input) && Number.isFinite(output)) {
+    tally.inputTokens += input as number;
+    tally.outputTokens += output as number;
+  } else {
+    tally.missingUsage += 1;
+  }
+}
+
+export async function analyzeMeal(input: AnalyzeRequest, config: AiConfig, tally?: UsageTally): Promise<MealAnalysis> {
   const args = buildArgs(input, config);
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     let content: string | null;
     try {
       const completion = await config.client.chat.completions.create(args);
+      if (tally) countCall(tally, completion.usage);
       content = completion.choices[0]?.message?.content ?? null;
     } catch (err) {
       throw new AnalyzeError(err instanceof APIConnectionTimeoutError ? "TIMEOUT" : "AI_ERROR");
