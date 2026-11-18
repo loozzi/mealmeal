@@ -1,4 +1,6 @@
-export type Price = { inputPer1M: number; outputPer1M: number };
+import type { StatsPrice } from "@/lib/admin-types";
+
+export type Price = StatsPrice;
 
 const PRICE_PATTERN = /^\d+(\.\d+)?$/;
 
