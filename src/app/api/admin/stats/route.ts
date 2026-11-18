@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { ADMIN_ERROR_MESSAGE, ADMIN_ERROR_STATUS, STATS_RANGES, type AdminErrorCode, type StatsRange } from "@/lib/admin-types";
 import { isAdmin } from "@/lib/server/admin-auth";
 import { loadRawStats } from "@/lib/server/admin-data";
@@ -7,7 +8,7 @@ import { getAdmin } from "@/lib/server/firebase-admin";
 import { parsePrice } from "@/lib/server/pricing";
 import { rangeDates } from "@/lib/server/vn-date";
 
-// Node.js runtime (the default). Reading the Authorization header makes this route dynamic.
+// Node.js runtime (the default).
 export const maxDuration = 60;
 
 class AdminError extends Error {
@@ -37,6 +38,8 @@ function readRange(req: Request): StatsRange {
 }
 
 export async function GET(req: Request): Promise<Response> {
+  // Prerendering stops here; without it the build would run this handler and catch its bail-out below.
+  await connection();
   const started = Date.now();
   let outcome: AdminErrorCode | "OK" = "OK";
   let response: Response;

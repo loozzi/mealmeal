@@ -35,6 +35,11 @@ export default defineConfig({
         NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "127.0.0.1",
         NEXT_PUBLIC_FIREBASE_APP_ID: "demo-app",
         FIREBASE_AUTH_EMULATOR_HOST: "127.0.0.1:9099",
+        // Admin page: firebase-admin talks to the Firestore emulator; fixed test prices.
+        FIRESTORE_EMULATOR_HOST: "127.0.0.1:8085",
+        ADMIN_EMAILS: "admin@example.com",
+        AI_PRICE_INPUT_PER_1M_USD: "0.10",
+        AI_PRICE_OUTPUT_PER_1M_USD: "0.40",
       },
     },
   ],

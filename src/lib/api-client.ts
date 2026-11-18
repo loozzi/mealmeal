@@ -33,7 +33,7 @@ const API_CODES: readonly ApiErrorCode[] = [
 /** Returns the signed-in user's Firebase ID token, or null when nobody is signed in. */
 export type TokenGetter = (forceRefresh: boolean) => Promise<string | null>;
 
-const currentUserToken: TokenGetter = async (forceRefresh) => {
+export const currentUserToken: TokenGetter = async (forceRefresh) => {
   // Imported lazily so this module (and its tests) do not load Firebase up front.
   const { getFirebase } = await import("./firebase");
   return (await getFirebase().auth.currentUser?.getIdToken(forceRefresh)) ?? null;

@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ verify: vi.fn(), getAdmin: vi.fn(), load: vi.fn() }));
+const mocks = vi.hoisted(() => ({ verify: vi.fn(), getAdmin: vi.fn(), load: vi.fn(), connection: vi.fn() }));
 
 vi.mock("@/lib/server/auth", () => ({ verifyIdToken: mocks.verify }));
 vi.mock("@/lib/server/firebase-admin", () => ({ getAdmin: mocks.getAdmin }));
 vi.mock("@/lib/server/admin-data", () => ({ loadRawStats: mocks.load }));
+vi.mock("next/server", () => ({ connection: mocks.connection }));
 
 import { GET } from "@/app/api/admin/stats/route";
 import { AnalyzeError } from "@/lib/server/analyze";
@@ -27,6 +28,7 @@ beforeEach(() => {
     if (token === "user") return { uid: "u1", email: "user@example.com", emailVerified: true };
     throw new AnalyzeError("UNAUTHENTICATED");
   });
+  mocks.connection.mockReset().mockResolvedValue(undefined);
   mocks.getAdmin.mockReset().mockReturnValue({ db: {}, auth: {} });
   mocks.load.mockReset().mockResolvedValue({ accounts: [], daily: [], totals: [], meals: {} });
   vi.spyOn(console, "info").mockImplementation(() => {});
@@ -36,6 +38,13 @@ afterEach(() => {
 });
 
 describe("GET /api/admin/stats", () => {
+  // Under cacheComponents a GET is prerendered at build time unless it waits for a request first.
+  it("waits for a request before reading it", async () => {
+    await get();
+    expect(mocks.connection).toHaveBeenCalledTimes(1);
+    expect(mocks.connection.mock.invocationCallOrder[0]).toBeLessThan(mocks.verify.mock.invocationCallOrder[0]);
+  });
+
   it("401 without a token", async () => {
     expect(await expectError(await get("", {}), 401, "UNAUTHENTICATED")).toBe("Phiên đăng nhập đã hết. Hãy đăng nhập lại.");
   });

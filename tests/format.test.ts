@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import {
-  WEEKDAY_SHORT, formatDate, formatDateTime, formatUsd, formatDayLong, formatGrams, formatInt, formatMonth, parseDecimal,
+  WEEKDAY_SHORT, formatDate, formatDateTime, formatUsd, formatUsdRate, formatDayLong, formatGrams, formatInt, formatMonth, parseDecimal,
 } from "@/lib/format";
 
 test("formatInt", () => {
@@ -43,4 +43,11 @@ test("formatUsd uses 4 decimals under $1 and 2 otherwise", () => {
 
 test("formatDateTime shows dd/MM HH:mm in local time", () => {
   expect(formatDateTime(new Date(2026, 10, 17, 20, 31).toISOString())).toBe("17/11 20:31");
+});
+
+test("formatUsdRate keeps at least 2 decimals and drops trailing zeros", () => {
+  expect(formatUsdRate(0.1)).toBe("$0,10");
+  expect(formatUsdRate(0.4)).toBe("$0,40");
+  expect(formatUsdRate(0.075)).toBe("$0,075");
+  expect(formatUsdRate(2.5)).toBe("$2,50");
 });

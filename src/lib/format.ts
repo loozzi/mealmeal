@@ -66,3 +66,8 @@ export function formatDateTime(iso: string): string {
   const d = new Date(iso);
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+
+/** A per-million-token price: like `formatUsd` (4 decimals at most), trailing zeros dropped down to 2. */
+export function formatUsdRate(n: number): string {
+  return formatUsd(n).replace(/(,\d\d\d*?)0+$/, "$1");
+}
