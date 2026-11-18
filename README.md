@@ -10,7 +10,8 @@ Thiết kế cho điện thoại. Có thể thêm vào màn hình chính như m�
 - **Ảnh bữa ăn không bao giờ lên server.** Ảnh chỉ lưu trong trình duyệt của máy đã chụp (IndexedDB, bảng `photos`). Mở bữa đó ở máy khác thì thấy dòng "Ảnh chỉ có trên thiết bị đã chụp."
 - Dữ liệu của bản cũ (chỉ lưu trên máy) được chuyển lên tài khoản ở lần đăng nhập đầu tiên, một lần duy nhất.
 - Đăng xuất xóa bản sao Firestore trên máy; ảnh vẫn ở lại máy.
-- Server chỉ kiểm token đăng nhập và chuyển ảnh/mô tả sang nhà cung cấp AI để phân tích. Server không lưu và không ghi log ảnh, mô tả, uid hay email; log chỉ có mã lỗi và thời gian xử lý.
+- Server chỉ kiểm token đăng nhập và chuyển ảnh/mô tả sang nhà cung cấp AI để phân tích. Server không lưu và không ghi log ảnh, mô tả hay email; log chỉ có mã kết quả và thời gian xử lý, không có uid.
+- **Số liệu sử dụng AI** (số lượt phân tích, số lượt gọi AI, token vào/ra) được server đếm theo uid và theo ngày giờ Việt Nam, lưu ở Firestore `usageDaily/{ngày}_{uid}` và `usageTotals/{uid}`. Rules chặn mọi truy cập từ app; chỉ server (`firebase-admin`) đọc/ghi. Số liệu này dùng cho trang quản trị.
 
 ## Chạy trên máy
 
@@ -29,7 +30,7 @@ Cần một project Firebase đã làm các bước ở mục "Cài Firebase" b�
 
 ## Biến môi trường
 
-Biến AI và Upstash chỉ dùng ở server. Biến `NEXT_PUBLIC_` duy nhất được phép là 4 biến cấu hình web Firebase; chúng công khai, không phải bí mật. Không cần service account: server tự kiểm token đăng nhập bằng khóa công khai của Google.
+Biến AI, Upstash, service account và admin chỉ dùng ở server. Biến `NEXT_PUBLIC_` duy nhất được phép là 4 biến cấu hình web Firebase; chúng công khai, không phải bí mật. Server tự kiểm token đăng nhập bằng khóa công khai của Google; service account chỉ cần cho số liệu sử dụng và trang quản trị.
 
 | Biến | Bắt buộc | Ý nghĩa |
 |---|---|---|
@@ -43,6 +44,10 @@ Biến AI và Upstash chỉ dùng ở server. Biến `NEXT_PUBLIC_` duy nhất �
 | `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | Có | Trên production là domain của app (`mealmeal-app.vercel.app`); local dùng `<projectId>.firebaseapp.com`. |
 | `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Có | Server dùng để kiểm token. Bắt đầu bằng `demo-` thì app dùng emulator (chỉ cho test). |
 | `NEXT_PUBLIC_FIREBASE_APP_ID` | Có | Cấu hình web Firebase. |
+| `FIREBASE_SERVICE_ACCOUNT_B64` | Có, để ghi và xem số liệu | Base64 của file JSON service account. **Bí mật**: trên Vercel đặt loại Sensitive. Không có thì app vẫn chạy, chỉ không ghi số liệu và trang quản trị báo chưa cấu hình. |
+| `ADMIN_EMAILS` | Có, để vào trang quản trị | Email Google của admin, cách nhau bằng dấu phẩy. Không có thì không ai vào được `/admin`. |
+| `AI_PRICE_INPUT_PER_1M_USD` | Không | Giá 1 triệu token vào, USD (ví dụ `0.10`). Thiếu thì trang quản trị không tính chi phí. |
+| `AI_PRICE_OUTPUT_PER_1M_USD` | Không | Giá 1 triệu token ra, USD. |
 
 Giới hạn lượt gọi phân tích: 10 lượt/phút và 60 lượt/ngày cho mỗi địa chỉ IP. Thiếu hai biến Upstash thì app dùng bộ đếm trong bộ nhớ. Bộ đếm này không chia sẻ giữa các instance serverless, nên trên Vercel hãy cấu hình Upstash.
 
@@ -81,11 +86,28 @@ Chủ dự án tự làm trên Firebase console (cần tài khoản Google của
 
 1. Đẩy mã lên GitHub rồi import repo vào Vercel. Không cần đổi cấu hình build.
 2. Tạo database Upstash Redis (trong Vercel Marketplace hoặc ở upstash.com). Lấy **REST URL** và **REST token**.
-3. Trong **Project → Settings → Environment Variables**, khai báo `OPENAI_API_KEY`, `AI_MODEL`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, 4 biến `NEXT_PUBLIC_FIREBASE_*` (`AUTH_DOMAIN` = `mealmeal-app.vercel.app`), và nếu cần thì `OPENAI_BASE_URL`, `AI_JSON_MODE`.
+3. Trong **Project → Settings → Environment Variables**, khai báo `OPENAI_API_KEY`, `AI_MODEL`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, 4 biến `NEXT_PUBLIC_FIREBASE_*` (`AUTH_DOMAIN` = `mealmeal-app.vercel.app`), và nếu cần thì `OPENAI_BASE_URL`, `AI_JSON_MODE`. Cho trang quản trị thì thêm các biến ở mục "Trang quản trị".
 4. Deploy lại để biến mới có hiệu lực.
 5. Mở trang trên điện thoại, chụp thử một bữa ăn để kiểm tra.
 
 **Quan trọng:** ai có tài khoản Google cũng đăng nhập và gọi được AI. Giới hạn lượt gọi chỉ hạn chế theo IP. Hãy **đặt hạn mức chi tiêu hằng tháng** (monthly budget/usage limit) trên trang quản trị của nhà cung cấp AI để không bị tính tiền ngoài dự kiến.
+
+## Trang quản trị
+
+`/admin` cho admin xem số tài khoản, người dùng hoạt động, số lượt phân tích, token, chi phí ước tính theo ngày và theo từng người (hôm nay, 7 ngày hoặc 30 ngày, theo giờ Việt Nam). Không có link trong app: mở bằng địa chỉ trực tiếp. Tài khoản admin vẫn dùng app như người thường. Người không có trong `ADMIN_EMAILS` chỉ thấy "Bạn không có quyền xem trang này."
+
+Cài đặt (chủ dự án tự làm):
+
+1. Firebase console → **Project settings → Service accounts** → **Generate new private key**. Tải file JSON về, **không** để trong thư mục dự án.
+2. Mã hóa base64 một dòng: `base64 -w0 <file>.json` (Linux) hoặc `base64 -i <file>.json` (macOS). Đưa kết quả vào `FIREBASE_SERVICE_ACCOUNT_B64` trong `.env.local` và trên Vercel production (Sensitive). Sau đó có thể xóa file JSON.
+3. Đặt `ADMIN_EMAILS` (các email Google của chủ dự án) ở `.env.local` và Vercel production.
+4. Tra giá model đang dùng ở nhà cung cấp (hoặc proxy), đặt hai biến giá. Có thể để trống và đặt sau.
+5. Publish lại `firestore.rules` (có thêm hai khối `usageDaily` và `usageTotals`).
+6. Deploy lại để biến mới có hiệu lực.
+
+Số liệu chỉ có từ lúc service account được cấu hình; các lượt phân tích trước đó không được đếm.
+
+**Lượt đọc Firestore:** mỗi lần mở hoặc làm mới trang với N người dùng tốn khoảng `N` (usageTotals) + `N` (đếm bữa ăn) + số cặp (người, ngày) có dùng trong khoảng (tối đa `30 × N`). Với 100 người và khoảng 30 ngày: tối đa khoảng 3.200 lượt. Gói free có 50.000 lượt mỗi ngày, đủ dùng.
 
 ## Thêm vào màn hình chính
 
@@ -98,3 +120,4 @@ Chủ dự án tự làm trên Firebase console (cần tài khoản Google của
 - Kế hoạch triển khai: `docs/superpowers/plans/2026-11-17-mealmeal-v1.md`
 - Kết quả nghiệm thu: `docs/superpowers/acceptance-report.md`
 - Đăng nhập và đồng bộ: `docs/superpowers/specs/2026-11-17-mealmeal-sync-design.md`, `docs/superpowers/plans/2026-11-17-mealmeal-sync.md`
+- Trang quản trị: `docs/superpowers/specs/2026-11-18-mealmeal-admin-design.md`, `docs/superpowers/plans/2026-11-18-mealmeal-admin.md`

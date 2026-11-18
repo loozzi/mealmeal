@@ -5,6 +5,7 @@ Web app chụp ảnh hoặc mô tả bữa ăn để AI ước tính dinh dưỡ
 - Spec (quyết định hành vi): `docs/superpowers/specs/2026-11-17-mealmeal-design.md`
 - Plan (tên file, chữ ký hàm, test): `docs/superpowers/plans/2026-11-17-mealmeal-v1.md`
 - Spec đồng bộ: `docs/superpowers/specs/2026-11-17-mealmeal-sync-design.md`; plan: `docs/superpowers/plans/2026-11-17-mealmeal-sync.md`
+- Spec trang quản trị: `docs/superpowers/specs/2026-11-18-mealmeal-admin-design.md`; plan: `docs/superpowers/plans/2026-11-18-mealmeal-admin.md`
 
 ## Lệnh
 
@@ -21,7 +22,8 @@ Web app chụp ảnh hoặc mô tả bữa ăn để AI ước tính dinh dưỡ
 - Toàn bộ chữ trên giao diện là tiếng Việt. Tên biến, tên hàm, commit message bằng tiếng Anh.
 - API key chỉ ở server. Biến `NEXT_PUBLIC_` duy nhất được phép là 4 biến cấu hình web Firebase: `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, `NEXT_PUBLIC_FIREBASE_APP_ID`.
 - Ảnh không bao giờ lên Firebase (Firestore hay bất kỳ dịch vụ nào). Ảnh chỉ nằm trong bảng `photos` của Dexie trên máy đã chụp.
-- Server không lưu và không log ảnh, mô tả bữa ăn, uid hay email. Chỉ log mã lỗi và thời gian xử lý.
+- Server không lưu và không log ảnh, mô tả bữa ăn hay email. Server chỉ lưu uid kèm số đếm sử dụng (`usageDaily`, `usageTotals`). Log chỉ có mã kết quả và thời gian xử lý, không có uid.
+- `firebase-admin` chỉ dùng ở server (`src/lib/server/**`, route handler). Ngày của số liệu sử dụng tính theo giờ Việt Nam bằng `vnDateKey`, không theo giờ máy chủ.
 - `DateKey` (`"YYYY-MM-DD"`) luôn tạo từ `getFullYear()/getMonth()/getDate()` của giờ máy. Cấm dùng `toISOString()` để lấy ngày.
 - Tổng dinh dưỡng không bao giờ lưu vào database; luôn tính bằng các hàm trong `src/lib/nutrition.ts`.
 - Chỉ làm tròn lúc hiển thị, qua các hàm trong `src/lib/format.ts`.
