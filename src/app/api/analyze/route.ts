@@ -1,8 +1,11 @@
+import { after } from "next/server";
 import { analyzeRequestSchema } from "@/lib/schema";
 import { getAiConfig } from "@/lib/server/ai-config";
 import { analyzeMeal, AnalyzeError, ERROR_STATUS } from "@/lib/server/analyze";
 import { verifyIdToken } from "@/lib/server/auth";
 import { getRateLimiter } from "@/lib/server/rate-limit";
+import { newTally, outcomeFor } from "@/lib/server/usage";
+import { recordUsage } from "@/lib/server/usage-store";
 import type { ApiErrorCode } from "@/lib/types";
 
 // Runs on the Node.js runtime, which is the default. `export const runtime` is rejected when
@@ -43,19 +46,27 @@ async function readInput(req: Request) {
   return parsed.data;
 }
 
+/** An error code that is safe to log: Firestore's string/number code, never the message. */
+function errorCode(err: unknown): string {
+  const code = (err as { code?: unknown } | null)?.code;
+  return typeof code === "string" || typeof code === "number" ? String(code) : "unknown";
+}
+
 export async function POST(req: Request): Promise<Response> {
   const started = Date.now();
   let outcome: ApiErrorCode | "OK" = "OK";
   let response: Response;
+  let uid: string | undefined;
+  const tally = newTally();
 
   try {
     // Before the body is read, so an unauthenticated caller costs nothing.
-    const uid = await authenticate(req);
+    uid = await authenticate(req);
     const { ok } = await getRateLimiter().check(`uid:${uid}`);
     if (!ok) throw new AnalyzeError("RATE_LIMITED");
 
     const input = await readInput(req);
-    const result = await analyzeMeal(input, getAiConfig());
+    const result = await analyzeMeal(input, getAiConfig(), tally);
     response = Response.json({ result });
   } catch (err) {
     outcome = err instanceof AnalyzeError ? err.code : "AI_ERROR";
@@ -67,5 +78,16 @@ export async function POST(req: Request): Promise<Response> {
 
   // Never log the request body (photo, description) or the user id.
   console.info(`analyze ${outcome} ${Date.now() - started}ms`);
+
+  // Counted after the response is sent; a failed write never changes what the user got.
+  const usageOutcome = outcomeFor(outcome);
+  const recordFor = uid;
+  if (recordFor && usageOutcome) {
+    after(() =>
+      recordUsage(recordFor, usageOutcome, tally, new Date()).catch((err) => {
+        console.warn(`usage write failed ${errorCode(err)}`);
+      }),
+    );
+  }
   return response;
 }

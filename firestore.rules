@@ -1,6 +1,7 @@
 rules_version = '2';
 
 // MealMeal: each signed-in user reads and writes only users/{their uid}/**.
+// usageDaily and usageTotals belong to the server alone.
 // Photos never reach Firestore, so any document carrying a `photo` field is refused.
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -38,6 +39,15 @@ service cloud.firestore {
         allow read, delete: if owner(uid);
         allow create, update: if owner(uid) && noPhoto() && validGoal(date, request.resource.data);
       }
+    }
+
+    // Usage counters: written only by the server (Admin SDK), never readable from the app.
+    match /usageDaily/{id} {
+      allow read, write: if false;
+    }
+
+    match /usageTotals/{uid} {
+      allow read, write: if false;
     }
   }
 }

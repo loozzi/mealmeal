@@ -135,3 +135,17 @@ test("any other path denied", async () => {
   await assertFails(setDoc(doc(alice(), "foo/bar"), { a: 1 }));
   await assertFails(getDoc(doc(alice(), "foo/bar")));
 });
+
+describe("usage counters", () => {
+  const adminUser = () => env.authenticatedContext("admin", { email: "admin@example.com", email_verified: true }).firestore();
+  const paths = ["usageDaily/2026-11-18_alice", "usageTotals/alice"];
+
+  test("nobody reads or writes usage from the client", async () => {
+    for (const db of [alice(), adminUser(), guest()]) {
+      for (const path of paths) {
+        await assertFails(getDoc(doc(db, path)));
+        await assertFails(setDoc(doc(db, path), { requests: 1 }));
+      }
+    }
+  });
+});

@@ -6,11 +6,19 @@ const mocks = vi.hoisted(() => ({
   check: vi.fn(),
   getAiConfig: vi.fn(),
   verify: vi.fn(),
+  record: vi.fn(),
+  afterRuns: [] as Promise<unknown>[],
 }));
 
 vi.mock("@/lib/server/ai-config", () => ({ getAiConfig: mocks.getAiConfig }));
 vi.mock("@/lib/server/rate-limit", () => ({ getRateLimiter: () => ({ check: mocks.check }) }));
 vi.mock("@/lib/server/auth", () => ({ verifyIdToken: mocks.verify }));
+vi.mock("@/lib/server/usage-store", () => ({ recordUsage: mocks.record }));
+vi.mock("next/server", () => ({
+  after: (fn: () => unknown) => {
+    mocks.afterRuns.push(Promise.resolve().then(fn));
+  },
+}));
 
 import { POST } from "@/app/api/analyze/route";
 import { AnalyzeError } from "@/lib/server/analyze";
@@ -48,7 +56,10 @@ beforeEach(() => {
     if (token === "good") return { uid: "u1" };
     throw new AnalyzeError("UNAUTHENTICATED");
   });
+  mocks.record.mockReset().mockResolvedValue(undefined);
+  mocks.afterRuns.length = 0;
   vi.spyOn(console, "info").mockImplementation(() => {});
+  vi.spyOn(console, "warn").mockImplementation(() => {});
 });
 
 describe("POST /api/analyze", () => {
@@ -149,5 +160,67 @@ describe("POST /api/analyze", () => {
     expect(line).toMatch(/OK/);
     expect(line).not.toContain("cơm gà");
     expect(line).not.toContain("u1");
+  });
+});
+
+describe("usage recording", () => {
+  const withUsage = (content: string, p: number, c: number) => ({ ...reply(content), usage: { prompt_tokens: p, completion_tokens: c } });
+  const settle = () => Promise.all(mocks.afterRuns);
+  const zero = { aiCalls: 0, inputTokens: 0, outputTokens: 0, missingUsage: 0 };
+
+  it("records an OK analysis with its tokens", async () => {
+    mocks.create.mockResolvedValue(withUsage(JSON.stringify(good), 100, 20));
+    expect((await post(validBody)).status).toBe(200);
+    await settle();
+    expect(mocks.record).toHaveBeenCalledTimes(1);
+    expect(mocks.record).toHaveBeenCalledWith(
+      "u1", "ok", { aiCalls: 1, inputTokens: 100, outputTokens: 20, missingUsage: 0 }, expect.any(Date),
+    );
+  });
+
+  it("records NOT_FOOD", async () => {
+    mocks.create.mockResolvedValue(withUsage(JSON.stringify({ ...good, is_food: false, items: [] }), 30, 3));
+    await post(validBody);
+    await settle();
+    expect(mocks.record).toHaveBeenCalledWith("u1", "notFood", { aiCalls: 1, inputTokens: 30, outputTokens: 3, missingUsage: 0 }, expect.any(Date));
+  });
+
+  it("records a failure after two unusable answers", async () => {
+    mocks.create.mockResolvedValue(withUsage("rác", 10, 1));
+    await post(validBody);
+    await settle();
+    expect(mocks.record).toHaveBeenCalledWith("u1", "failed", { aiCalls: 2, inputTokens: 20, outputTokens: 2, missingUsage: 0 }, expect.any(Date));
+  });
+
+  it("records a rate-limited request with no AI calls", async () => {
+    mocks.check.mockResolvedValue({ ok: false });
+    await post(validBody);
+    await settle();
+    expect(mocks.record).toHaveBeenCalledWith("u1", "rateLimited", zero, expect.any(Date));
+  });
+
+  it("records invalid input", async () => {
+    await post("{}");
+    await settle();
+    expect(mocks.record).toHaveBeenCalledWith("u1", "invalid", zero, expect.any(Date));
+  });
+
+  it("records nothing for an unauthenticated request", async () => {
+    await post(validBody, {});
+    await settle();
+    expect(mocks.record).not.toHaveBeenCalled();
+  });
+
+  it("keeps the response when the write fails and logs only the error code", async () => {
+    mocks.record.mockRejectedValue({ code: "unavailable" });
+    const res = await post(validBody);
+    expect(res.status).toBe(200);
+    await settle();
+    expect(console.warn).toHaveBeenCalledWith("usage write failed unavailable");
+    const logs = [
+      ...(console.info as unknown as { mock: { calls: unknown[][] } }).mock.calls,
+      ...(console.warn as unknown as { mock: { calls: unknown[][] } }).mock.calls,
+    ].flat().join(" ");
+    expect(logs).not.toContain("u1");
   });
 });
