@@ -12,9 +12,9 @@ type Props = {
 const PICK_CLASS =
   "inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl border border-line bg-card px-3 text-[15px] font-semibold text-ink active:bg-bg disabled:opacity-45";
 
-function CameraIcon() {
+export function CameraIcon({ className = "size-5" }: { className?: string }) {
   return (
-    <svg aria-hidden viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg aria-hidden viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M4 8h3l1.5-2h7L17 8h3v11H4z" />
       <circle cx="12" cy="13" r="3.5" />
     </svg>

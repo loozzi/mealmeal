@@ -1,16 +1,18 @@
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Calendar } from "@/components/calendar/Calendar";
 import { DayRing } from "@/components/calendar/DayRing";
 import { MealListItem } from "@/components/meal/MealListItem";
+import { CameraIcon } from "@/components/meal/PhotoPicker";
 import { monthGrid, resolveDateParam, todayKey, weekOf, type DateKey } from "@/lib/dates";
 import { dayMessage, dayStatus, type DayStatus } from "@/lib/day-status";
 import { useGoals, useMealsInRange } from "@/lib/db-hooks";
 import { formatDayLong, formatGrams, formatInt } from "@/lib/format";
 import { goalForDate } from "@/lib/goals";
+import { setPendingPhoto } from "@/lib/pending-photo";
 import { dayNutrients } from "@/lib/nutrition";
 import type { Meal } from "@/lib/types";
 
@@ -24,6 +26,7 @@ function Home() {
   const today = todayKey();
   const selected = resolveDateParam(useSearchParams().get("d"), today);
   const [view, setView] = useState<"week" | "month">("week");
+  const cameraRef = useRef<HTMLInputElement>(null);
 
   const shown = (view === "week" ? weekOf(selected) : monthGrid(selected)).filter((k): k is DateKey => k !== null);
   const from = shown[0];
@@ -135,7 +138,29 @@ function Home() {
         </section>
       </main>
 
-      <div className="pointer-events-none fixed inset-x-0 bottom-[calc(16px+env(safe-area-inset-bottom))] z-10 mx-auto flex max-w-[480px] justify-end px-4">
+      <div className="pointer-events-none fixed inset-x-0 bottom-[calc(16px+env(safe-area-inset-bottom))] z-10 mx-auto flex max-w-[480px] justify-end gap-2 px-4">
+        {/* Quick log: the camera has to open from this tap, so the input lives here and the add
+            page picks the photo up from memory and analyzes it. */}
+        <input
+          ref={cameraRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          hidden
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (file) router.push(`/add?d=${selected}&photo=${setPendingPhoto(file)}`);
+          }}
+        />
+        <button
+          type="button"
+          aria-label="Chụp bữa ăn"
+          onClick={() => cameraRef.current?.click()}
+          className="pointer-events-auto inline-flex size-12 items-center justify-center rounded-full border border-line bg-card text-ink shadow-lg shadow-ink/20 active:bg-line/60"
+        >
+          <CameraIcon className="size-6" />
+        </button>
         <Link
           href={`/add?d=${selected}`}
           className="pointer-events-auto inline-flex min-h-12 items-center gap-1.5 rounded-full bg-ink px-5 text-[15px] font-semibold text-white shadow-lg shadow-ink/20 active:bg-ink/85"

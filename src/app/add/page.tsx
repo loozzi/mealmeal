@@ -15,8 +15,9 @@ import { putPhoto, requestPersistentStorage } from "@/lib/local-db";
 import { saveMeal } from "@/lib/store";
 import { formatDayLong } from "@/lib/format";
 import { prepareImage } from "@/lib/image";
+import { clearPendingPhoto, peekPendingPhoto } from "@/lib/pending-photo";
 import { toMealItem } from "@/lib/nutrition";
-import { TEXT_MAX_CHARS } from "@/lib/schema";
+import { TEXT_MAX_CHARS, type MealAnalysis } from "@/lib/schema";
 
 type Phase = "input" | "analyzing" | "result";
 
@@ -24,10 +25,13 @@ const defaultTime = (date: DateKey) => (date === todayKey() ? nowTime() : "12:00
 
 function AddMeal() {
   const router = useRouter();
-  const date = resolveDateParam(useSearchParams().get("d"), todayKey());
+  const params = useSearchParams();
+  const date = resolveDateParam(params.get("d"), todayKey());
+  const pendingId = params.get("photo");
   const homeHref = `/?d=${date}`;
 
-  const [phase, setPhase] = useState<Phase>("input");
+  // A photo from the home screen's camera button starts analyzing at once (see the effect below).
+  const [phase, setPhase] = useState<Phase>(() => (peekPendingPhoto(pendingId) ? "analyzing" : "input"));
   const [photo, setPhoto] = useState<{ blob: Blob; dataUrl: string } | null>(null);
   const [preparing, setPreparing] = useState(false);
   const [text, setText] = useState("");
@@ -68,6 +72,19 @@ function AddMeal() {
   const description = text.trim();
   const canAnalyze = !preparing && (photo !== null || description !== "");
 
+  const showResult = (result: MealAnalysis) => {
+    setDraft({ ...result, items: result.items.map((item) => toMealItem(item, crypto.randomUUID())) });
+    setMealId(crypto.randomUUID());
+    setEditorValid(false);
+    setPhase("result");
+  };
+
+  const showAnalyzeError = (err: unknown) => {
+    const code = err instanceof AnalyzeClientError ? err.code : "AI_ERROR";
+    if (code !== "ABORTED") setError(ERROR_MESSAGE[code]);
+    setPhase("input");
+  };
+
   const handleAnalyze = async () => {
     if (!canAnalyze) return;
     const controller = new AbortController();
@@ -75,19 +92,61 @@ function AddMeal() {
     setError(null);
     setPhase("analyzing");
     try {
-      const result = await analyze({ image: photo?.dataUrl, text: description || undefined }, controller.signal);
-      setDraft({ ...result, items: result.items.map((item) => toMealItem(item, crypto.randomUUID())) });
-      setMealId(crypto.randomUUID());
-      setEditorValid(false);
-      setPhase("result");
+      showResult(await analyze({ image: photo?.dataUrl, text: description || undefined }, controller.signal));
     } catch (err) {
-      const code = err instanceof AnalyzeClientError ? err.code : "AI_ERROR";
-      if (code !== "ABORTED") setError(ERROR_MESSAGE[code]);
-      setPhase("input");
+      showAnalyzeError(err);
     } finally {
       if (controllerRef.current === controller) controllerRef.current = null;
     }
   };
+
+  // A photo taken with the home screen's camera button is analyzed straight away; the result
+  // still waits for the user to review and save. A run cut short by leaving the page (or by
+  // React re-running effects) changes nothing and leaves the photo for the next run; a run that
+  // finishes forgets it, so coming back to this URL does not analyze it twice.
+  const showResultRef = useRef(showResult);
+  const showErrorRef = useRef(showAnalyzeError);
+  useEffect(() => {
+    showResultRef.current = showResult;
+    showErrorRef.current = showAnalyzeError;
+  });
+  useEffect(() => {
+    const file = peekPendingPhoto(pendingId);
+    if (!file || pendingId === null) return;
+    let cancelled = false;
+    const controller = new AbortController();
+    controllerRef.current = controller;
+    void (async () => {
+      let prepared: { blob: Blob; dataUrl: string };
+      try {
+        prepared = await prepareImage(file);
+      } catch {
+        if (cancelled) return;
+        clearPendingPhoto(pendingId);
+        setError("Không đọc được ảnh này. Hãy thử ảnh khác.");
+        setPhase("input");
+        return;
+      }
+      if (cancelled) return;
+      setPhoto(prepared);
+      try {
+        const result = await analyze({ image: prepared.dataUrl }, controller.signal);
+        if (cancelled) return;
+        clearPendingPhoto(pendingId);
+        showResultRef.current(result);
+      } catch (err) {
+        if (cancelled) return;
+        clearPendingPhoto(pendingId);
+        showErrorRef.current(err);
+      } finally {
+        if (controllerRef.current === controller) controllerRef.current = null;
+      }
+    })();
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [pendingId]);
 
   const handleSave = async () => {
     if (!draft || !mealId || !editorValid || savingRef.current) return;
